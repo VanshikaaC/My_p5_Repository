@@ -1,0 +1,747 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Mitered Square · Josef Albers</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500;1,700&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
+    body { background:#e8e6e2; }
+    @keyframes ripple { from{transform:scale(0);opacity:0.4} to{transform:scale(3.5);opacity:0} }
+    @keyframes bar1 { 0%,100%{height:4px} 50%{height:14px} }
+    @keyframes bar2 { 0%,100%{height:8px} 50%{height:5px} }
+    @keyframes bar3 { 0%,100%{height:6px} 25%{height:14px} 75%{height:3px} }
+    @keyframes bar4 { 0%,100%{height:10px} 40%{height:4px} 80%{height:13px} }
+    button:hover { opacity:1 !important; }
+    ::-webkit-scrollbar { width:4px; }
+    ::-webkit-scrollbar-track { background:transparent; }
+    ::-webkit-scrollbar-thumb { background:rgba(0,0,0,0.1); border-radius:2px; }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useRef, useCallback, useEffect } = React;
+
+    const PALETTES = [
+      {
+        name: "Emerald", year: "1976",
+        center: [8,159,118], tb: [210,235,220], sides: [170,215,192], bg: [240,246,242],
+        melody: [
+          { freq: 523.25, dur: 0.18 }, { freq: 659.25, dur: 0.18 }, { freq: 783.99, dur: 0.18 },
+          { freq: 1046.5, dur: 0.28 }, { freq: 783.99, dur: 0.18 }, { freq: 659.25, dur: 0.18 },
+          { freq: 783.99, dur: 0.22 }, { freq: 880.00, dur: 0.32 },
+        ],
+        wave: 'sine', attack: 0.04, decay: 0.12, sustain: 0.6, release: 0.28, vibrato: 3,
+        desc: "Luminous & ascending",
+      },
+      {
+        name: "Slate", year: "1974",
+        center: [158,174,188], tb: [228,231,234], sides: [208,213,218], bg: [234,236,239],
+        melody: [
+          { freq: 440.00, dur: 0.38 }, { freq: 415.30, dur: 0.28 }, { freq: 369.99, dur: 0.38 },
+          { freq: 392.00, dur: 0.48 }, { freq: 349.23, dur: 0.28 }, { freq: 369.99, dur: 0.55 },
+        ],
+        wave: 'sine', attack: 0.14, decay: 0.22, sustain: 0.45, release: 0.55, vibrato: 1.2,
+        desc: "Cool & meditative",
+      },
+      {
+        name: "Sage", year: "1972",
+        center: [142,170,98], tb: [226,224,190], sides: [200,204,158], bg: [224,222,184],
+        melody: [
+          { freq: 392.00, dur: 0.22 }, { freq: 440.00, dur: 0.22 }, { freq: 493.88, dur: 0.22 },
+          { freq: 587.33, dur: 0.30 }, { freq: 493.88, dur: 0.20 }, { freq: 440.00, dur: 0.22 },
+          { freq: 493.88, dur: 0.20 }, { freq: 392.00, dur: 0.40 },
+        ],
+        wave: 'triangle', attack: 0.06, decay: 0.18, sustain: 0.55, release: 0.35, vibrato: 2,
+        desc: "Pastoral & warm",
+      },
+      {
+        name: "Crimson", year: "1975",
+        center: [162,18,26], tb: [235,218,210], sides: [218,194,186], bg: [234,220,213],
+        melody: [
+          { freq: 293.66, dur: 0.14 }, { freq: 349.23, dur: 0.14 }, { freq: 440.00, dur: 0.22 },
+          { freq: 415.30, dur: 0.30 }, { freq: 369.99, dur: 0.16 }, { freq: 440.00, dur: 0.14 },
+          { freq: 493.88, dur: 0.16 }, { freq: 415.30, dur: 0.45 },
+        ],
+        wave: 'sawtooth', attack: 0.02, decay: 0.08, sustain: 0.7, release: 0.22, vibrato: 4.5,
+        desc: "Passionate & urgent",
+      },
+      {
+        name: "Yellow", year: "1973",
+        center: [252,206,0], tb: [246,234,192], sides: [236,216,148], bg: [244,232,184],
+        melody: [
+          { freq: 659.25, dur: 0.13 }, { freq: 783.99, dur: 0.13 }, { freq: 880.00, dur: 0.13 },
+          { freq: 987.77, dur: 0.20 }, { freq: 880.00, dur: 0.13 }, { freq: 783.99, dur: 0.13 },
+          { freq: 880.00, dur: 0.13 }, { freq: 1046.5, dur: 0.30 },
+        ],
+        wave: 'square', attack: 0.01, decay: 0.06, sustain: 0.5, release: 0.14, vibrato: 5,
+        desc: "Bright & electric",
+      },
+    ];
+
+    const W=480, H=480, SQ=96, REST_X=192, REST_Y=288, MARGIN=55, DURATION=700;
+    function rgb(c){return `rgb(${c[0]},${c[1]},${c[2]})`;}
+    function hex(c){return '#'+c.map(v=>v.toString(16).padStart(2,'0')).join('');}
+    function pts(...p){return p.map(([x,y])=>`${x},${y}`).join(' ');}
+    function lerpC(a,b,t){return a.map((v,i)=>Math.round(v+(b[i]-v)*t));}
+    function easeOut(t){return 1-Math.pow(1-t,3);}
+
+    /* ─── NAV BAR ──────────────────────────────────────────────── */
+    function NavBar({ page, onNav }) {
+      const links = [
+        { id: 'home', label: 'Home' },
+        { id: 'introduction', label: 'Introduction' },
+        { id: 'painting', label: 'The Painting' },
+      ];
+      return (
+        <nav style={{
+          position: 'fixed', top: 0, left: 0, right: 0, zIndex: 100,
+          background: 'rgba(232,230,226,0.92)',
+          backdropFilter: 'blur(10px)',
+          borderBottom: '1px solid rgba(0,0,0,0.08)',
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          padding: '0 36px', height: 56,
+          fontFamily: "'Cormorant Garamond', Georgia, serif",
+          boxSizing: 'border-box',
+        }}>
+          <div
+            onClick={() => onNav('home')}
+            style={{ cursor: 'pointer', display: 'flex', flexDirection: 'column', gap: 1 }}
+          >
+            <div style={{ fontSize: 8, letterSpacing: '0.44em', color: 'rgba(0,0,0,0.3)', textTransform: 'uppercase', fontWeight: 700 }}>
+              Josef Albers
+            </div>
+            <div style={{ fontSize: 16, fontWeight: 700, fontStyle: 'italic', color: '#1a1714', lineHeight: 1 }}>
+              Mitered Square
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+            {links.map(({ id, label }) => {
+              const active = page === id;
+              return (
+                <button
+                  key={id}
+                  onClick={() => onNav(id)}
+                  style={{
+                    background: 'transparent',
+                    border: 'none',
+                    borderBottom: active ? '2px solid #1a1714' : '2px solid transparent',
+                    cursor: 'pointer',
+                    padding: '6px 16px',
+                    fontFamily: "'Cormorant Garamond', Georgia, serif",
+                    fontSize: 12,
+                    fontWeight: active ? 700 : 500,
+                    letterSpacing: '0.18em',
+                    textTransform: 'uppercase',
+                    color: active ? '#1a1714' : 'rgba(0,0,0,0.42)',
+                    transition: 'color 0.2s, border-color 0.2s',
+                    whiteSpace: 'nowrap',
+                  }}
+                  onMouseEnter={e => { if (!active) e.currentTarget.style.color = '#1a1714'; }}
+                  onMouseLeave={e => { if (!active) e.currentTarget.style.color = 'rgba(0,0,0,0.42)'; }}
+                >
+                  {label}
+                </button>
+              );
+            })}
+          </div>
+        </nav>
+      );
+    }
+
+    /* ─── HOME PAGE ─────────────────────────────────────────────── */
+    function HomePage({ onNav }) {
+      const [visible, setVisible] = useState(false);
+      useEffect(() => { setTimeout(() => setVisible(true), 80); }, []);
+
+      const cards = [
+        {
+          id: 'introduction',
+          tag: 'Introduction',
+          heading: 'About the Work',
+          body: "Discover the life and philosophy of Josef Albers — Bauhaus master, Yale professor, and pioneer of colour theory. Learn how the Mitered Square series uses geometry to conjure depth, illusion, and perception.",
+          cta: 'Read Introduction →',
+        },
+        {
+          id: 'painting',
+          tag: 'The Painting',
+          heading: 'Interactive Study',
+          body: "Explore five colour palettes drawn from Albers's work. Drag the centre square to shift perspective. Click a palette to hear its generative melody — each waveform tuned to mirror the colour's emotional temperature.",
+          cta: 'Open the Painting →',
+        },
+      ];
+
+      return (
+        <div style={{
+          minHeight: '100vh',
+          background: '#e8e6e2',
+          display: 'flex',
+          flexDirection: 'column',
+          fontFamily: "'Cormorant Garamond', Georgia, serif",
+          paddingTop: 56,
+          boxSizing: 'border-box',
+          position: 'relative',
+          overflow: 'hidden',
+        }}>
+          {/* Grain */}
+          <div style={{
+            position: 'absolute', inset: 0, opacity: 0.035, pointerEvents: 'none',
+            backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")`,
+            backgroundSize: '180px',
+          }}/>
+          {[0,1,2,3].map(k => (
+            <div key={k} style={{
+              position: 'absolute', top: 72 + k * 22, right: 48 + k * 22,
+              width: 60 - k * 12, height: 60 - k * 12,
+              border: `1px solid rgba(0,0,0,${0.05 + k * 0.025})`,
+              pointerEvents: 'none',
+            }}/>
+          ))}
+          {[0,1,2,3].map(k => (
+            <div key={k} style={{
+              position: 'absolute', bottom: 48 + k * 22, left: 48 + k * 22,
+              width: 60 - k * 12, height: 60 - k * 12,
+              border: `1px solid rgba(0,0,0,${0.05 + k * 0.025})`,
+              pointerEvents: 'none',
+            }}/>
+          ))}
+
+          <div style={{
+            flex: 1, display: 'flex', flexDirection: 'column',
+            alignItems: 'center', justifyContent: 'center',
+            padding: '64px 24px 48px', boxSizing: 'border-box',
+          }}>
+            <div style={{ width: '100%', maxWidth: 720 }}>
+
+              <div style={{
+                opacity: visible ? 1 : 0,
+                transform: visible ? 'translateY(0)' : 'translateY(24px)',
+                transition: 'opacity 0.8s ease 0.08s, transform 0.8s ease 0.08s',
+                marginBottom: 20,
+              }}>
+                <div style={{ fontSize: 10, letterSpacing: '0.44em', color: 'rgba(0,0,0,0.25)', textTransform: 'uppercase', fontWeight: 700, marginBottom: 16 }}>
+                  An Interactive Study · Josef Albers · Interaction of Color
+                </div>
+                <div style={{ fontSize: 'clamp(44px,8vw,80px)', fontWeight: 700, fontStyle: 'italic', color: '#1a1714', lineHeight: 1.0, marginBottom: 20 }}>
+                  Mitered<br />Square
+                </div>
+                <div style={{ width: 64, height: 2, background: 'rgba(0,0,0,0.15)', marginBottom: 24 }}/>
+                <div style={{ fontSize: 16, color: 'rgba(0,0,0,0.4)', lineHeight: 1.75, maxWidth: 480, letterSpacing: '0.02em' }}>
+                  A study in colour perception, perspective illusion, and synesthetic sound — drawn from Josef Albers's landmark series.
+                </div>
+              </div>
+
+              {/* Palette strip */}
+              <div style={{
+                opacity: visible ? 1 : 0,
+                transition: 'opacity 0.9s ease 0.32s',
+                marginTop: 36, marginBottom: 48,
+                display: 'flex', gap: 3,
+              }}>
+                {PALETTES.map((p, i) => (
+                  <div
+                    key={i}
+                    onClick={() => onNav('painting')}
+                    title={`${p.name} palette`}
+                    style={{
+                      flex: 1, height: 8,
+                      background: hex(p.center),
+                      cursor: 'pointer',
+                      transition: 'height 0.2s',
+                    }}
+                    onMouseEnter={e => { e.currentTarget.style.height = '14px'; }}
+                    onMouseLeave={e => { e.currentTarget.style.height = '8px'; }}
+                  />
+                ))}
+              </div>
+
+              {/* Cards */}
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
+                gap: 20,
+                opacity: visible ? 1 : 0,
+                transform: visible ? 'translateY(0)' : 'translateY(18px)',
+                transition: 'opacity 0.8s ease 0.48s, transform 0.8s ease 0.48s',
+              }}>
+                {cards.map(({ id, tag, heading, body, cta }) => (
+                  <div
+                    key={id}
+                    onClick={() => onNav(id)}
+                    style={{
+                      background: 'rgba(255,255,255,0.45)',
+                      border: '1px solid rgba(0,0,0,0.08)',
+                      padding: '28px 28px 24px',
+                      cursor: 'pointer',
+                      transition: 'background 0.2s, transform 0.2s, box-shadow 0.2s',
+                      boxSizing: 'border-box',
+                    }}
+                    onMouseEnter={e => {
+                      e.currentTarget.style.background = 'rgba(255,255,255,0.72)';
+                      e.currentTarget.style.transform = 'translateY(-3px)';
+                      e.currentTarget.style.boxShadow = '0 8px 32px rgba(0,0,0,0.08)';
+                    }}
+                    onMouseLeave={e => {
+                      e.currentTarget.style.background = 'rgba(255,255,255,0.45)';
+                      e.currentTarget.style.transform = 'translateY(0)';
+                      e.currentTarget.style.boxShadow = 'none';
+                    }}
+                  >
+                    <div style={{ fontSize: 9, letterSpacing: '0.38em', color: 'rgba(0,0,0,0.3)', textTransform: 'uppercase', fontWeight: 700, marginBottom: 10 }}>{tag}</div>
+                    <div style={{ fontSize: 22, fontWeight: 700, fontStyle: 'italic', color: '#1a1714', marginBottom: 12, lineHeight: 1.1 }}>{heading}</div>
+                    <div style={{ fontSize: 13.5, color: 'rgba(0,0,0,0.5)', lineHeight: 1.82, marginBottom: 22 }}>{body}</div>
+                    <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.2em', textTransform: 'uppercase', color: '#1a1714' }}>{cta}</div>
+                  </div>
+                ))}
+              </div>
+
+            </div>
+          </div>
+
+          <div style={{
+            textAlign: 'center', padding: '18px 24px', fontSize: 10,
+            letterSpacing: '0.22em', color: 'rgba(0,0,0,0.2)', textTransform: 'uppercase',
+            fontFamily: "'Cormorant Garamond', Georgia, serif",
+            borderTop: '1px solid rgba(0,0,0,0.06)',
+          }}>
+            Five palettes · Five melodies · One draggable square
+          </div>
+        </div>
+      );
+    }
+
+    /* ─── INTRODUCTION PAGE ─────────────────────────────────────── */
+    function IntroductionPage() {
+      const [visible, setVisible] = useState(false);
+      useEffect(() => { setTimeout(() => setVisible(true), 60); }, []);
+
+      const Section = ({ label, children, delay }) => (
+        <div style={{
+          opacity: visible ? 1 : 0,
+          transform: visible ? 'translateY(0)' : 'translateY(22px)',
+          transition: `opacity 0.7s ease ${delay}s, transform 0.7s ease ${delay}s`,
+        }}>
+          <div style={{ fontSize: 9, letterSpacing: '0.38em', color: 'rgba(0,0,0,0.28)', textTransform: 'uppercase', fontWeight: 700, marginBottom: 10 }}>{label}</div>
+          <div style={{ fontSize: 14.5, color: 'rgba(0,0,0,0.62)', lineHeight: 1.88, fontWeight: 400, letterSpacing: '0.01em' }}>{children}</div>
+        </div>
+      );
+
+      return (
+        <div style={{
+          minHeight: '100vh', background: '#e8e6e2',
+          display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+          fontFamily: "'Cormorant Garamond', Georgia, serif",
+          padding: '88px 24px 64px', boxSizing: 'border-box',
+          position: 'relative', overflow: 'hidden',
+        }}>
+          <div style={{
+            position: 'absolute', inset: 0, opacity: 0.035, pointerEvents: 'none',
+            backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")`,
+            backgroundSize: '180px',
+          }}/>
+          {[0,1,2].map(k => (
+            <div key={k} style={{
+              position: 'absolute', top: 72 + k * 18, right: 40 + k * 18,
+              width: 48 - k * 10, height: 48 - k * 10,
+              border: `1px solid rgba(0,0,0,${0.06 + k * 0.03})`, pointerEvents: 'none',
+            }}/>
+          ))}
+          {[0,1,2].map(k => (
+            <div key={k} style={{
+              position: 'absolute', bottom: 40 + k * 18, left: 40 + k * 18,
+              width: 48 - k * 10, height: 48 - k * 10,
+              border: `1px solid rgba(0,0,0,${0.06 + k * 0.03})`, pointerEvents: 'none',
+            }}/>
+          ))}
+
+          <div style={{ width: '100%', maxWidth: 720, display: 'flex', flexDirection: 'column', gap: 48 }}>
+
+            <div style={{
+              opacity: visible ? 1 : 0,
+              transform: visible ? 'translateY(0)' : 'translateY(28px)',
+              transition: 'opacity 0.8s ease 0.05s, transform 0.8s ease 0.05s',
+            }}>
+              <div style={{ fontSize: 10, letterSpacing: '0.42em', color: 'rgba(0,0,0,0.22)', textTransform: 'uppercase', fontWeight: 700, marginBottom: 14 }}>
+                Josef Albers · Interaction of Color
+              </div>
+              <div style={{ fontSize: 'clamp(38px,7vw,64px)', fontWeight: 700, color: '#1a1714', fontStyle: 'italic', lineHeight: 1.05, marginBottom: 16 }}>
+                Mitered<br/>Square
+              </div>
+              <div style={{ width: 52, height: 2, background: 'rgba(0,0,0,0.18)', marginBottom: 20 }}/>
+              <div style={{ fontSize: 15, color: 'rgba(0,0,0,0.38)', letterSpacing: '0.04em', lineHeight: 1.6 }}>
+                An interactive study in colour perception, perspective illusion, and synesthetic sound.
+              </div>
+            </div>
+
+            <div style={{ height: 1, background: 'rgba(0,0,0,0.08)', opacity: visible ? 1 : 0, transition: 'opacity 0.6s ease 0.3s' }}/>
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 40 }}>
+              <Section label="Josef Albers" delay={0.35}>
+                Josef Albers (1888–1976) was a German-American artist and educator whose life's work centred on the systematic study of colour relationships. A Bauhaus master turned Yale professor, he believed colour was the most relativistic element in art — its appearance forever shaped by what surrounds it. His landmark 1963 treatise <em>Interaction of Color</em> remains a foundational text in art education worldwide.
+              </Section>
+              <Section label="Mitered Square" delay={0.48}>
+                In the <em>Mitered Square</em> series, Albers placed a small solid square at the centre of a larger field divided into trapezoidal bands. By mitering the corners of each band at 45°, the geometry suggests a receding tunnel or hovering volume — a three-dimensional illusion conjured entirely through flat colour. Drag the centre square to shift the perspective and watch the surrounding space breathe.
+              </Section>
+              <Section label="Why Music?" delay={0.61}>
+                Albers spoke of colour as having <em>temperature, weight, and voice</em>. Each palette here is paired with a short generative melody whose character mirrors the colour's mood: warm sinusoidal tones for muted greens, sharp sawtooth phrases for reds, bright staccato squares for yellow. The waveform, tempo, and vibrato depth are all tuned to the palette — an attempt to let you hear what your eyes already feel.
+              </Section>
+            </div>
+
+            <div style={{ height: 1, background: 'rgba(0,0,0,0.08)', opacity: visible ? 1 : 0, transition: 'opacity 0.6s ease 0.5s' }}/>
+
+            <div style={{ opacity: visible ? 1 : 0, transition: 'opacity 0.8s ease 0.65s' }}>
+              <div style={{ fontSize: 9, letterSpacing: '0.38em', color: 'rgba(0,0,0,0.25)', textTransform: 'uppercase', fontWeight: 700, marginBottom: 16 }}>
+                Five Palettes
+              </div>
+              <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
+                {PALETTES.map((p, i) => (
+                  <div key={i} style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    <div style={{ display: 'flex', gap: 2 }}>
+                      {[p.bg, p.sides, p.tb, p.center].map((col, ci) => (
+                        <div key={ci} style={{ width: ci === 3 ? 20 : 14, height: 28, background: hex(col) }}/>
+                      ))}
+                    </div>
+                    <div style={{ fontSize: 9, letterSpacing: '0.1em', color: 'rgba(0,0,0,0.35)', fontStyle: 'italic' }}>{p.name}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+          </div>
+        </div>
+      );
+    }
+
+    /* ─── PAINTING PAGE ─────────────────────────────────────────── */
+    function PaintingPage() {
+      const [activeIdx,setActiveIdx]=useState(0);
+      const [fromIdx,setFromIdx]=useState(0);
+      const [lerpAmt,setLerpAmt]=useState(1);
+      const [sqPos,setSqPos]=useState({x:REST_X,y:REST_Y});
+      const [dragging,setDragging]=useState(false);
+      const [dragOff,setDragOff]=useState({dx:0,dy:0});
+      const [playing,setPlaying]=useState(false);
+      const [rippleKey,setRippleKey]=useState(null);
+
+      const svgRef=useRef(), rafRef=useRef(), startRef=useRef();
+      const audioCtxRef=useRef(null);
+
+      const getCtx=()=>{
+        if(!audioCtxRef.current) audioCtxRef.current=new(window.AudioContext||window.webkitAudioContext)();
+        if(audioCtxRef.current.state==='suspended') audioCtxRef.current.resume();
+        return audioCtxRef.current;
+      };
+
+      const playMelody=(palIdx)=>{
+        const ctx=getCtx();
+        const p=PALETTES[palIdx];
+        let t=ctx.currentTime+0.05;
+        p.melody.forEach(({freq,dur})=>{
+          const osc=ctx.createOscillator();
+          const gain=ctx.createGain();
+          const vOsc=ctx.createOscillator();
+          const vGain=ctx.createGain();
+          vOsc.frequency.value=p.vibrato;
+          vGain.gain.value=freq*0.012;
+          vOsc.connect(vGain); vGain.connect(osc.frequency);
+          osc.type=p.wave;
+          osc.frequency.setValueAtTime(freq,t);
+          const{attack:atk,decay:dec,sustain:sus,release:rel}=p;
+          gain.gain.setValueAtTime(0,t);
+          gain.gain.linearRampToValueAtTime(0.28,t+atk);
+          gain.gain.linearRampToValueAtTime(0.28*sus,t+atk+dec);
+          gain.gain.setValueAtTime(0.28*sus,t+dur-rel);
+          gain.gain.linearRampToValueAtTime(0,t+dur+rel*0.5);
+          osc.connect(gain); gain.connect(ctx.destination);
+          vOsc.start(t); osc.start(t);
+          vOsc.stop(t+dur+rel); osc.stop(t+dur+rel);
+          t+=dur;
+        });
+        const totalDur=p.melody.reduce((s,n)=>s+n.dur,0)+1.0;
+        setPlaying(true);
+        setTimeout(()=>setPlaying(false),totalDur*1000);
+      };
+
+      useEffect(()=>{
+        cancelAnimationFrame(rafRef.current);
+        if(lerpAmt>=1)return;
+        startRef.current=performance.now();
+        const tick=(now)=>{
+          const t=Math.min(1,(now-startRef.current)/DURATION);
+          setLerpAmt(easeOut(t));
+          if(t<1)rafRef.current=requestAnimationFrame(tick);
+        };
+        rafRef.current=requestAnimationFrame(tick);
+        return()=>cancelAnimationFrame(rafRef.current);
+      },[activeIdx]);
+
+      useEffect(()=>{
+        if(dragging)return;
+        const id=setInterval(()=>{
+          setSqPos(p=>{
+            const nx=p.x+(REST_X-p.x)*0.1, ny=p.y+(REST_Y-p.y)*0.1;
+            if(Math.abs(nx-REST_X)<0.5&&Math.abs(ny-REST_Y)<0.5)return{x:REST_X,y:REST_Y};
+            return{x:nx,y:ny};
+          });
+        },16);
+        return()=>clearInterval(id);
+      },[dragging]);
+
+      const selectPalette=(i)=>{
+        setRippleKey(`${i}-${Date.now()}`);
+        if(i===activeIdx){ playMelody(i); return; }
+        setFromIdx(activeIdx); setLerpAmt(0); setActiveIdx(i);
+        playMelody(i);
+      };
+
+      const clamp=(v,lo,hi)=>Math.max(lo,Math.min(hi,v));
+      const getSVG=(cx,cy)=>{const r=svgRef.current.getBoundingClientRect();return{mx:(cx-r.left)*(W/r.width),my:(cy-r.top)*(H/r.height)};};
+
+      const onMD=useCallback((e)=>{e.preventDefault();const{mx,my}=getSVG(e.clientX,e.clientY);setDragOff({dx:mx-sqPos.x,dy:my-sqPos.y});setDragging(true);},[sqPos]);
+      const onMM=useCallback((e)=>{if(!dragging)return;const{mx,my}=getSVG(e.clientX,e.clientY);setSqPos({x:clamp(mx-dragOff.dx,MARGIN,W-MARGIN-SQ),y:clamp(my-dragOff.dy,MARGIN,H-MARGIN-SQ)});},[dragging,dragOff]);
+      const onMU=useCallback(()=>setDragging(false),[]);
+      const onTS=useCallback((e)=>{const t=e.touches[0],{mx,my}=getSVG(t.clientX,t.clientY);setDragOff({dx:mx-sqPos.x,dy:my-sqPos.y});setDragging(true);},[sqPos]);
+      const onTM=useCallback((e)=>{if(!dragging)return;e.preventDefault();const t=e.touches[0],{mx,my}=getSVG(t.clientX,t.clientY);setSqPos({x:clamp(mx-dragOff.dx,MARGIN,W-MARGIN-SQ),y:clamp(my-dragOff.dy,MARGIN,H-MARGIN-SQ)});},[dragging,dragOff]);
+
+      const pal={
+        center:lerpC(PALETTES[fromIdx].center,PALETTES[activeIdx].center,lerpAmt),
+        tb:    lerpC(PALETTES[fromIdx].tb,    PALETTES[activeIdx].tb,    lerpAmt),
+        sides: lerpC(PALETTES[fromIdx].sides, PALETTES[activeIdx].sides, lerpAmt),
+        bg:    lerpC(PALETTES[fromIdx].bg,    PALETTES[activeIdx].bg,    lerpAmt),
+      };
+
+      const{x,y}=sqPos;
+      const x1=x,x2=x+SQ,y1=y,y2=y+SQ;
+      const topLX=x1/2,topLY=y1/2,topRX=(W+x2)/2,topRY=y1/2;
+      const botLX=x1/2,botLY=(H+y2)/2,botRX=(W+x2)/2,botRY=(H+y2)/2;
+      const ap=PALETTES[activeIdx];
+
+      return (
+        <div style={{
+          minHeight:'100vh', background:'#e0deda',
+          display:'flex', flexDirection:'column',
+          fontFamily:"'Cormorant Garamond',Georgia,serif", userSelect:'none',
+          paddingTop: 56,
+        }}>
+
+          {/* Status bar */}
+          <div style={{
+            width:'100%', display:'flex', justifyContent:'flex-end', alignItems:'center',
+            padding:'10px 36px', boxSizing:'border-box',
+            borderBottom:'1px solid rgba(0,0,0,0.08)',
+            flexShrink: 0, minHeight: 44,
+          }}>
+            <div style={{display:'flex',alignItems:'center',gap:10}}>
+              {playing && (
+                <div style={{display:'flex',gap:2,alignItems:'flex-end',height:14}}>
+                  {[0,1,2,3].map(k=>(
+                    <div key={k} style={{
+                      width:3,borderRadius:2,background:hex(ap.center),
+                      animation:`bar${k+1} ${0.45+k*0.08}s ease-in-out infinite`,
+                      boxShadow:`0 0 4px ${hex(ap.center)}`,
+                    }}/>
+                  ))}
+                </div>
+              )}
+              <span style={{fontSize:11,color:playing?hex(ap.center):'rgba(0,0,0,0.28)',letterSpacing:'0.18em',textTransform:'uppercase',fontWeight:700,transition:'color 0.4s',fontStyle:'italic'}}>
+                {playing ? `${ap.name} · ${ap.desc}` : 'Select a colour'}
+              </span>
+            </div>
+          </div>
+
+          {/* THREE-COLUMN LAYOUT */}
+          <div style={{ flex:1, display:'flex', alignItems:'stretch', overflow:'hidden' }}>
+
+            {/* LEFT: PALETTE PICKER */}
+            <div style={{
+              width:220, flexShrink:0,
+              borderRight:'1px solid rgba(0,0,0,0.1)',
+              display:'flex', flexDirection:'column',
+              padding:'28px 0', overflowY:'auto',
+            }}>
+              <div style={{padding:'0 20px 16px',fontSize:9,letterSpacing:'0.34em',color:'rgba(0,0,0,0.25)',textTransform:'uppercase',fontWeight:700}}>
+                Colour Palettes
+              </div>
+              <div style={{fontSize:10,color:'rgba(0,0,0,0.16)',fontStyle:'italic',letterSpacing:'0.04em',padding:'0 20px 20px',lineHeight:1.6}}>
+                Click to change colour &amp; hear its melody
+              </div>
+
+              {PALETTES.map((p,i)=>{
+                const on=activeIdx===i;
+                const accentH=hex(p.center);
+                return (
+                  <button key={i} onClick={()=>selectPalette(i)} style={{
+                    position:'relative', overflow:'hidden',
+                    display:'flex', flexDirection:'column', alignItems:'stretch',
+                    background:on?'rgba(0,0,0,0.06)':'transparent',
+                    border:'none', borderLeft:`3px solid ${on?accentH:'transparent'}`,
+                    cursor:'pointer', padding:'0 0 0 0', marginBottom:6, textAlign:'left',
+                    transition:'background 0.2s, border-color 0.2s',
+                  }}>
+                    {rippleKey&&rippleKey.startsWith(`${i}-`)&&(
+                      <span key={rippleKey} style={{
+                        position:'absolute',left:'50%',top:'50%',
+                        width:60,height:60,marginLeft:-30,marginTop:-30,
+                        borderRadius:'50%',background:accentH,
+                        animation:'ripple 0.55s ease-out forwards',
+                        pointerEvents:'none',zIndex:0,
+                      }}/>
+                    )}
+                    <div style={{display:'flex',height:44,position:'relative',zIndex:1}}>
+                      {[p.bg,p.sides,p.tb,p.center].map((col,ci)=>(
+                        <div key={ci} style={{
+                          flex: ci===3?'0 0 52px':1, background:hex(col),
+                          borderRight:ci<3?'1px solid rgba(0,0,0,0.12)':'none',
+                          position:'relative', transition:'filter 0.2s',
+                          filter:on&&ci===3?'brightness(1.05)':'none',
+                        }}>
+                          {on&&ci===3&&<div style={{position:'absolute',inset:0,background:'linear-gradient(150deg,rgba(255,255,255,0.3) 0%,transparent 55%)'}}/>}
+                        </div>
+                      ))}
+                    </div>
+                    <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'7px 14px 7px 11px',position:'relative',zIndex:1}}>
+                      <div>
+                        <div style={{fontSize:13,fontWeight:on?700:500,fontStyle:'italic',color:on?'#111':'rgba(0,0,0,0.38)',letterSpacing:'0.03em',transition:'color 0.2s'}}>{p.name}</div>
+                        <div style={{fontSize:9,color:on?accentH:'rgba(0,0,0,0.22)',letterSpacing:'0.1em',marginTop:2,fontStyle:'italic',transition:'color 0.25s'}}>{p.desc}</div>
+                      </div>
+                      <div style={{flexShrink:0}}>
+                        {on&&playing?(
+                          <div style={{display:'flex',gap:2,alignItems:'flex-end',height:12}}>
+                            {[0,1,2].map(k=><div key={k} style={{width:2.5,borderRadius:1.5,background:accentH,animation:`bar${k+1} ${0.4+k*0.09}s ease-in-out infinite`}}/>)}
+                          </div>
+                        ):on?(
+                          <div style={{width:6,height:6,borderRadius:'50%',background:accentH,boxShadow:`0 0 8px 2px ${accentH}88`}}/>
+                        ):(
+                          <svg width="10" height="10" viewBox="0 0 10 10" style={{opacity:0.18}}>
+                            <polygon points="2,1 9,5 2,9" fill="rgba(0,0,0,0.4)"/>
+                          </svg>
+                        )}
+                      </div>
+                    </div>
+                  </button>
+                );
+              })}
+
+              {/* Values */}
+              <div style={{marginTop:'auto',padding:'20px 20px 0',borderTop:'1px solid rgba(0,0,0,0.1)'}}>
+                <div style={{fontSize:9,letterSpacing:'0.32em',color:'rgba(0,0,0,0.22)',textTransform:'uppercase',fontWeight:700,marginBottom:10}}>Values</div>
+                {[{label:'Bg',col:ap.bg},{label:'Light',col:ap.tb},{label:'Shadow',col:ap.sides},{label:'Accent',col:ap.center}].map(({label,col})=>(
+                  <div key={label} style={{display:'flex',alignItems:'center',gap:8,marginBottom:7}}>
+                    <div style={{width:18,height:11,background:hex(col),border:'1px solid rgba(0,0,0,0.12)',flexShrink:0}}/>
+                    <span style={{fontSize:9.5,fontWeight:700,color:'rgba(0,0,0,0.28)',letterSpacing:'0.08em',width:46}}>{label}</span>
+                    <span style={{fontSize:10,color:'rgba(0,0,0,0.45)',fontFamily:'monospace'}}>{hex(col)}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* CENTRE: CANVAS */}
+            <div style={{flex:1,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',padding:'32px 24px'}}>
+              <svg ref={svgRef} viewBox={`0 0 ${W} ${H}`} style={{
+                display:'block', cursor:dragging?'grabbing':'default',
+                width:'min(460px,75vw)', height:'min(460px,75vw)',
+                boxShadow:'0 0 0 1px rgba(0,0,0,0.1), 0 28px 90px rgba(0,0,0,0.2)',
+                flexShrink:0,
+              }} onMouseMove={onMM} onMouseUp={onMU} onMouseLeave={onMU} onTouchMove={onTM} onTouchEnd={onMU}>
+                <rect width={W} height={H} fill={rgb(pal.bg)}/>
+                <polygon fill={rgb(pal.tb)}    points={pts([topLX,topLY],[topRX,topRY],[x2,y1],[x1,y1])}/>
+                <polygon fill={rgb(pal.tb)}    points={pts([x1,y2],[x2,y2],[botRX,botRY],[botLX,botLY])}/>
+                <polygon fill={rgb(pal.tb)}    points={pts([0,0],[topLX,topLY],[botLX,botLY],[0,H])}/>
+                <polygon fill={rgb(pal.tb)}    points={pts([topRX,topRY],[W,0],[W,H],[botRX,botRY])}/>
+                <polygon fill={rgb(pal.sides)} points={pts([topLX,topLY],[x1,y1],[x1,y2],[botLX,botLY])}/>
+                <polygon fill={rgb(pal.sides)} points={pts([x2,y1],[topRX,topRY],[botRX,botRY],[x2,y2])}/>
+                <polygon fill={rgb(pal.sides)} points={pts([0,0],[W,0],[topRX,topRY],[topLX,topLY])}/>
+                <polygon fill={rgb(pal.sides)} points={pts([botLX,botLY],[botRX,botRY],[W,H],[0,H])}/>
+                <rect x={x1} y={y1} width={SQ} height={SQ} fill={rgb(pal.center)} style={{
+                  cursor:dragging?'grabbing':'grab',
+                  filter:playing?`drop-shadow(0 0 10px ${hex(ap.center)})`:'none',
+                  transition:'filter 0.4s',
+                }} onMouseDown={onMD} onTouchStart={onTS}/>
+              </svg>
+              <div style={{marginTop:18,display:'flex',alignItems:'center',gap:16,opacity:0.5}}>
+                <div style={{width:24,height:1,background:'rgba(0,0,0,0.3)'}}/>
+                <div style={{fontSize:10,color:'rgba(0,0,0,0.5)',letterSpacing:'0.22em',textTransform:'uppercase',fontWeight:600}}>Drag the centre square</div>
+                <div style={{width:24,height:1,background:'rgba(0,0,0,0.3)'}}/>
+              </div>
+            </div>
+
+            {/* RIGHT: INFO */}
+            <div style={{width:200,flexShrink:0,borderLeft:'1px solid rgba(0,0,0,0.1)',display:'flex',flexDirection:'column',padding:'28px 20px',gap:28,overflowY:'auto'}}>
+              <div>
+                <div style={{fontSize:9,letterSpacing:'0.34em',color:'rgba(0,0,0,0.25)',textTransform:'uppercase',fontWeight:700,marginBottom:10}}>About the Work</div>
+                <div style={{fontSize:12,color:'rgba(0,0,0,0.38)',lineHeight:1.88,fontStyle:'italic'}}>
+                  Albers used mitered corners to create the illusion of depth — each band of colour appears to recede or advance depending on its neighbours. The same hue reads entirely differently when surrounded by different tones.
+                </div>
+              </div>
+              <div style={{height:1,background:'rgba(0,0,0,0.07)'}}/>
+              <div>
+                <div style={{fontSize:9,letterSpacing:'0.34em',color:'rgba(0,0,0,0.25)',textTransform:'uppercase',fontWeight:700,marginBottom:10}}>Colour &amp; Sound</div>
+                <div style={{fontSize:12,color:'rgba(0,0,0,0.38)',lineHeight:1.88,fontStyle:'italic'}}>
+                  Each palette is assigned a waveform that mirrors its emotional temperature. Warm greens ring with sine waves. Reds cut with sawtooth edges. Yellow crackles in bright square waves.
+                </div>
+              </div>
+              <div style={{height:1,background:'rgba(0,0,0,0.07)'}}/>
+              <div>
+                <div style={{fontSize:9,letterSpacing:'0.34em',color:'rgba(0,0,0,0.25)',textTransform:'uppercase',fontWeight:700,marginBottom:8}}>Active</div>
+                <div style={{display:'flex',gap:3,marginBottom:8}}>
+                  {[ap.bg,ap.tb,ap.sides,ap.center].map((col,ci)=>(
+                    <div key={ci} style={{
+                      flex:ci===3?'0 0 32px':1, height:20, background:hex(col),
+                      boxShadow:ci===3&&playing?`0 0 10px 3px ${hex(col)}66`:'none',
+                      transition:'box-shadow 0.4s',
+                    }}/>
+                  ))}
+                </div>
+                <div style={{fontSize:14,fontWeight:700,fontStyle:'italic',color:'#1a1714',letterSpacing:'0.03em'}}>{ap.name}</div>
+                <div style={{fontSize:10,color:hex(ap.center),letterSpacing:'0.1em',fontStyle:'italic',marginTop:3,opacity:0.85}}>{ap.desc}</div>
+                <div style={{fontSize:9.5,color:'rgba(0,0,0,0.22)',letterSpacing:'0.1em',marginTop:4}}>{ap.year} · {ap.wave} wave</div>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      );
+    }
+
+    /* ─── ROOT ──────────────────────────────────────────────────── */
+    function App() {
+      const [page, setPage] = useState('home');
+      const [displayPage, setDisplayPage] = useState('home');
+      const [fading, setFading] = useState(false);
+
+      const navigate = (target) => {
+        if (target === displayPage) return;
+        setFading(true);
+        setTimeout(() => {
+          setDisplayPage(target);
+          setPage(target);
+          setFading(false);
+        }, 260);
+      };
+
+      return (
+        <>
+          <NavBar page={page} onNav={navigate} />
+          <div style={{ opacity: fading ? 0 : 1, transition: 'opacity 0.26s ease', minHeight: '100vh' }}>
+            {displayPage === 'home'         && <HomePage onNav={navigate} />}
+            {displayPage === 'introduction' && <IntroductionPage />}
+            {displayPage === 'painting'     && <PaintingPage />}
+          </div>
+        </>
+      );
+    }
+
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<App />);
+  </script>
+</body>
+</html>
